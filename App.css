@@ -1,0 +1,119 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap");
+
+/* ─── Design Tokens ─────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f0f4f3;
+  --bg-2: #ffffff;
+  --bg-3: #e8efed;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --text-1: #0b1f1a;
+  --text-2: #3d5a52;
+  --text-3: #7a9990;
+  --accent: #1a7a6e;
+  --accent-2: #0f5c52;
+  --accent-soft: rgba(26, 122, 110, 0.1);
+  --accent-softer: rgba(26, 122, 110, 0.06);
+  --chip-bg: rgba(255, 255, 255, 0.7);
+  --chip-border: rgba(0, 0, 0, 0.1);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --input-bg: #ffffff;
+  --ocean-1: rgba(26, 122, 110, 0.06);
+  --ocean-2: rgba(26, 122, 110, 0.04);
+  --ripple-color: rgba(26, 122, 110, 0.07);
+  --user-bubble: #e0f0ee;
+  --bot-bubble: #ffffff;
+  --header-bg: rgba(240, 244, 243, 0.85);
+  --mode-active-bg: #1a7a6e;
+  --mode-active-text: #ffffff;
+  --mode-idle-bg: rgba(255, 255, 255, 0.6);
+  --mode-idle-text: #3d5a52;
+}
+
+[data-theme="dark"] {
+  --bg: #080d0c;
+  --bg-2: #0f1614;
+  --bg-3: #161e1c;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text-1: #e8f5f2;
+  --text-2: #7ab8ae;
+  --text-3: #3d6b64;
+  --accent: #2ddbb4;
+  --accent-2: #1fb89a;
+  --accent-soft: rgba(45, 219, 180, 0.12);
+  --accent-softer: rgba(45, 219, 180, 0.06);
+  --chip-bg: rgba(255, 255, 255, 0.05);
+  --chip-border: rgba(255, 255, 255, 0.09);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --input-bg: #0f1614;
+  --ocean-1: rgba(45, 219, 180, 0.05);
+  --ocean-2: rgba(45, 219, 180, 0.03);
+  --ripple-color: rgba(45, 219, 180, 0.06);
+  --user-bubble: #162824;
+  --bot-bubble: #0f1614;
+  --header-bg: rgba(8, 13, 12, 0.85);
+  --mode-active-bg: #2ddbb4;
+  --mode-active-text: #060d0b;
+  --mode-idle-bg: rgba(255, 255, 255, 0.05);
+  --mode-idle-text: #7ab8ae;
+}
+
+/* ─── Reset ─────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Ocean Background ──────────────────────────────────── */
+.app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+  background: var(--bg); /* ← ADD THIS LINE */
+}
+
+.ocean-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--bg); /* ← ADD THIS LINE */
+  transition: background 0.3s ease;
+}
+
+/* ─── Main layout ───────────────────────────────────────── */
+.app-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
