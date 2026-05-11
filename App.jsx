@@ -47,21 +47,55 @@ export default function App() {
     setIsLoading(true);
     if (!hasStarted) setHasStarted(true);
 
-    // ── Replace this block with your real API call ──
     try {
-      await new Promise((r) => setTimeout(r, 1500));
+      const response = await fetch("https://your-api-endpoint.com/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // "Authorization": "Bearer YOUR_TOKEN",  ← add if your API needs auth
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        // Server responded with 4xx / 5xx
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || `Server error: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `Here's what I found for your **${activeMode.label}** query.\n\nPayload dispatched:\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``,
+          // ← adjust "data.answer" to match your API's response shape
+          content:
+            data.answer ??
+            data.message ??
+            data.response ??
+            JSON.stringify(data),
+          mode: activeMode,
+        },
+      ]);
+    } catch (err) {
+      const isNetwork = err instanceof TypeError; // fetch() itself failed (offline, CORS, bad URL)
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "error",
+          content: isNetwork
+            ? "Unable to reach the server. Check your connection and try again."
+            : err.message || "Something went wrong. Please try again.",
           mode: activeMode,
         },
       ]);
     } finally {
       setIsLoading(false);
     }
-    // ───────────────────────────────────────────────
   };
 
   return (
