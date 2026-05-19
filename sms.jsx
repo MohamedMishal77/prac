@@ -1,11 +1,6 @@
-// CustomerForm.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import "./customer-form.css";
 
-const FALLBACK_CUSTOMER_TYPES = [
-  { label: "Contract", value: "contract" },
-  { label: "Portal", value: "portal" },
-];
+import React, { useEffect, useMemo, useState } from "react";
+import "./CustomerForm.css";
 
 const EMPTY_FORM = {
   customerBillingName: "",
@@ -13,13 +8,16 @@ const EMPTY_FORM = {
   shortName: "",
   longName: "",
   aliasName: "",
-  customerType: "contract",
+  customerTypeId: "",
   addressLine1: "",
   addressLine2: "",
   city: "",
   country: "",
   postalCode: "",
   countryCode: "",
+  telephone: "",
+  email: "",
+  website: "",
   status: "active",
 };
 
@@ -29,15 +27,16 @@ const REQUIRED_FIELDS = [
   "addressLine1",
   "city",
   "country",
-  "customerType",
+  "customerTypeId",
   "status",
 ];
 
-function FormField({ label, children, error, fullWidth = false }) {
+function FormField({ label, children, error, hint, fullWidth = false }) {
   return (
     <div className={`field ${fullWidth ? "field--full" : ""}`}>
       <label className="field__label">{label}</label>
       {children}
+      {hint ? <div className="field__hint">{hint}</div> : null}
       {error ? <div className="field__error">{error}</div> : null}
     </div>
   );
@@ -45,122 +44,51 @@ function FormField({ label, children, error, fullWidth = false }) {
 
 function validateForm(data) {
   const errors = {};
-
   REQUIRED_FIELDS.forEach((field) => {
     if (!String(data[field] ?? "").trim()) {
       errors[field] = "Field required";
     }
   });
-
   return errors;
 }
 
-export default function CustomerForm({ mode = "add", customerId, onClose, onSubmit }) {
-  const isViewMode = mode === "view";
-  const isEditMode = mode === "edit";
+export default function CustomerForm({
+  mode = "add",
+  initialValues = null,
+  customerTypeOptions = [],
+  customerTypeLoading = false,
+  customerTypeError = "",
+  auditUser = "system",
+  onCancel,
+  onSubmit,
+}) {
   const isAddMode = mode === "add";
+  const isViewMode = mode === "view";
 
-  const [formData, setFormData] = useState(EMPTY_FORM);
-  const [customerTypeOptions, setCustomerTypeOptions] = useState(FALLBACK_CUSTOMER_TYPES);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const mergedInitialValues = useMemo(() => {
+    return {
+      ...EMPTY_FORM,
+      ...(initialValues || {}),
+      status: initialValues?.status || "active",
+    };
+  }, [initialValues]);
+
+  const [formData, setFormData] = useState(mergedInitialValues);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
-
-  const title = useMemo(() => {
-    if (isAddMode) return "Add Customer";
-    if (isEditMode) return "Edit Customer";
-    return "View Customer";
-  }, [isAddMode, isEditMode]);
-
-  const disabled = isViewMode || loading || saving;
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let ignore = false;
+    setFormData(mergedInitialValues);
+    setErrors({});
+    setSubmitted(false);
+  }, [mergedInitialValues]);
 
-    const loadCustomerTypes = async () => {
-      try {
-        const res = await fetch("/api/customer-types");
-        if (!res.ok) throw new Error("Failed to load customer types");
-
-        const data = await res.json();
-        const options = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data)
-          ? data.data
-          : [];
-
-        if (!ignore && options.length > 0) {
-          setCustomerTypeOptions(
-            options.map((item) => ({
-              label: item.label ?? item.name ?? String(item.value ?? item),
-              value: item.value ?? item.code ?? String(item.label ?? item.name ?? item),
-            }))
-          );
-        }
-      } catch {
-        if (!ignore) setCustomerTypeOptions(FALLBACK_CUSTOMER_TYPES);
-      }
-    };
-
-    loadCustomerTypes();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadCustomer = async () => {
-      if (isAddMode || !customerId) {
-        setFormData(EMPTY_FORM);
-        setErrors({});
-        setSubmitted(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/customers/${customerId}`);
-        if (!res.ok) throw new Error("Failed to load customer");
-
-        const data = await res.json();
-        const customer = data?.data ?? data;
-
-        if (!ignore && customer) {
-          setFormData({
-            customerBillingName: customer.customerBillingName ?? "",
-            customerCode: customer.customerCode ?? "",
-            shortName: customer.shortName ?? "",
-            longName: customer.longName ?? "",
-            aliasName: customer.aliasName ?? "",
-            customerType: customer.customerType ?? "contract",
-            addressLine1: customer.addressLine1 ?? "",
-            addressLine2: customer.addressLine2 ?? "",
-            city: customer.city ?? "",
-            country: customer.country ?? "",
-            postalCode: customer.postalCode ?? "",
-            countryCode: customer.countryCode ?? "",
-            status: customer.status ?? "active",
-          });
-          setErrors({});
-          setSubmitted(false);
-        }
-      } catch {
-        if (!ignore) setFormData(EMPTY_FORM);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-
-    loadCustomer();
-
-    return () => {
-      ignore = true;
-    };
-  }, [customerId, isAddMode]);
+  const selectedCustomerType = useMemo(() => {
+    return customerTypeOptions.find(
+      (opt) => String(opt.customerTypeId) === String(formData.customerTypeId)
+    );
+  }, [customerTypeOptions, formData.customerTypeId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -170,7 +98,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
       [name]: value,
     }));
 
-    if (submitted) {
+    if (submitted && errors[name]) {
       setErrors((prev) => {
         const next = { ...prev };
         if (String(value ?? "").trim()) {
@@ -183,13 +111,49 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
 
   const handleBlur = (e) => {
     const { name, value } = e.target;
-
     if (!String(value ?? "").trim()) {
       setErrors((prev) => ({
         ...prev,
         [name]: "Field required",
       }));
     }
+  };
+
+  const buildPayload = (data) => {
+    const basePayload = {
+      customerBillingName: data.customerBillingName.trim(),
+      customerCode: data.customerCode.trim(),
+      shortName: data.shortName?.trim() || "",
+      longName: data.longName?.trim() || "",
+      aliasName: data.aliasName?.trim() || "",
+      customerTypeId: data.customerTypeId,
+      customerType: selectedCustomerType?.customerType ?? "",
+      customerTypeDescription: selectedCustomerType?.customerTypeDescription ?? "",
+      addressLine1: data.addressLine1.trim(),
+      addressLine2: data.addressLine2?.trim() || "",
+      city: data.city.trim(),
+      country: data.country.trim(),
+      postalCode: data.postalCode?.trim() || "",
+      countryCode: data.countryCode?.trim() || "",
+      telephone: data.telephone?.trim() || "",
+      email: data.email?.trim() || "",
+      website: data.website?.trim() || "",
+      isActive: data.status === "active",
+      status: data.status,
+    };
+
+    if (isAddMode) {
+      return {
+        ...basePayload,
+        createdBy: auditUser,
+        updatedBy: auditUser,
+      };
+    }
+
+    return {
+      ...basePayload,
+      updatedBy: auditUser,
+    };
   };
 
   const handleSubmit = async (e) => {
@@ -204,11 +168,8 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
 
     setSaving(true);
     try {
-      await onSubmit?.({
-        ...formData,
-        customerId: customerId ?? null,
-        mode,
-      });
+      const payload = buildPayload(formData);
+      await onSubmit?.(payload);
     } finally {
       setSaving(false);
     }
@@ -219,12 +180,6 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
 
   return (
     <form className="customer-form" onSubmit={handleSubmit} noValidate>
-      <div className="customer-form__header">
-        <h2 className="customer-form__title">{title}</h2>
-      </div>
-
-      {loading && <div className="customer-form__loading">Loading customer data...</div>}
-
       <section className="form-section">
         <h3>General Information</h3>
         <div className="form-grid">
@@ -234,7 +189,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               value={formData.customerBillingName}
               onChange={handleChange}
               onBlur={handleBlur}
-              disabled={disabled}
+              disabled={isViewMode}
               className={controlClass("customerBillingName")}
               type="text"
             />
@@ -246,7 +201,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               value={formData.customerCode}
               onChange={handleChange}
               onBlur={handleBlur}
-              disabled={disabled}
+              disabled={isViewMode}
               className={controlClass("customerCode")}
               type="text"
             />
@@ -257,7 +212,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               name="shortName"
               value={formData.shortName}
               onChange={handleChange}
-              disabled={disabled}
+              disabled={isViewMode}
               className="field__control"
               type="text"
             />
@@ -268,7 +223,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               name="longName"
               value={formData.longName}
               onChange={handleChange}
-              disabled={disabled}
+              disabled={isViewMode}
               className="field__control"
               type="text"
             />
@@ -279,30 +234,41 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               name="aliasName"
               value={formData.aliasName}
               onChange={handleChange}
-              disabled={disabled}
+              disabled={isViewMode}
               className="field__control"
               type="text"
             />
           </FormField>
 
-          <FormField label="Customer Type" error={errors.customerType}>
+          <FormField
+            label="Customer Type"
+            error={errors.customerTypeId}
+            hint={selectedCustomerType?.customerTypeDescription || ""}
+          >
             <select
-              name="customerType"
-              value={formData.customerType}
+              name="customerTypeId"
+              value={formData.customerTypeId}
               onChange={handleChange}
               onBlur={handleBlur}
-              disabled={disabled}
-              className={controlClass("customerType")}
+              disabled={isViewMode || customerTypeLoading}
+              className={controlClass("customerTypeId")}
+              title={selectedCustomerType?.customerTypeDescription || ""}
             >
               <option value="">Select</option>
               {customerTypeOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
+                <option
+                  key={item.customerTypeId}
+                  value={item.customerTypeId}
+                  title={item.customerTypeDescription || ""}
+                >
+                  {item.customerType}
                 </option>
               ))}
             </select>
           </FormField>
         </div>
+
+        {customerTypeError ? <div className="customer-form__banner">{customerTypeError}</div> : null}
       </section>
 
       <section className="form-section">
@@ -315,7 +281,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
                 value={formData.addressLine1}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                disabled={disabled}
+                disabled={isViewMode}
                 className={controlClass("addressLine1")}
                 type="text"
               />
@@ -326,7 +292,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
                 name="addressLine2"
                 value={formData.addressLine2}
                 onChange={handleChange}
-                disabled={disabled}
+                disabled={isViewMode}
                 className="field__control"
                 type="text"
               />
@@ -339,7 +305,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               value={formData.city}
               onChange={handleChange}
               onBlur={handleBlur}
-              disabled={disabled}
+              disabled={isViewMode}
               className={controlClass("city")}
               type="text"
             />
@@ -351,7 +317,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               value={formData.country}
               onChange={handleChange}
               onBlur={handleBlur}
-              disabled={disabled}
+              disabled={isViewMode}
               className={controlClass("country")}
               type="text"
             />
@@ -362,7 +328,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               name="postalCode"
               value={formData.postalCode}
               onChange={handleChange}
-              disabled={disabled}
+              disabled={isViewMode}
               className="field__control"
               type="text"
             />
@@ -373,9 +339,42 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
               name="countryCode"
               value={formData.countryCode}
               onChange={handleChange}
-              disabled={disabled}
+              disabled={isViewMode}
               className="field__control"
               type="text"
+            />
+          </FormField>
+
+          <FormField label="Telephone">
+            <input
+              name="telephone"
+              value={formData.telephone}
+              onChange={handleChange}
+              disabled={isViewMode}
+              className="field__control"
+              type="text"
+            />
+          </FormField>
+
+          <FormField label="Email">
+            <input
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={isViewMode}
+              className="field__control"
+              type="email"
+            />
+          </FormField>
+
+          <FormField label="Website">
+            <input
+              name="website"
+              value={formData.website}
+              onChange={handleChange}
+              disabled={isViewMode}
+              className="field__control"
+              type="url"
             />
           </FormField>
         </div>
@@ -393,7 +392,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
                 checked={formData.status === "active"}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                disabled={disabled}
+                disabled={isViewMode}
               />
               <span>Active</span>
             </label>
@@ -406,7 +405,7 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
                 checked={formData.status === "inactive"}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                disabled={disabled}
+                disabled={isViewMode}
               />
               <span>Inactive</span>
             </label>
@@ -416,16 +415,267 @@ export default function CustomerForm({ mode = "add", customerId, onClose, onSubm
       )}
 
       <div className="customer-form__actions">
-        <button type="button" className="btn btn--secondary" onClick={onClose} disabled={saving}>
+        <button type="button" className="btn btn--secondary" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
 
         {!isViewMode && (
-          <button type="submit" className="btn btn--primary" disabled={loading || saving}>
+          <button type="submit" className="btn btn--primary" disabled={saving || customerTypeLoading}>
             {saving ? "Saving..." : "Save"}
           </button>
         )}
       </div>
     </form>
+  );
+}
+
+
+
+
+
+import React, { useEffect, useMemo, useState } from "react";
+import Modal from "./Modal";
+import CustomerForm from "./CustomerForm";
+import { getCustomerById, fetchCustomerTypes } from "../../services/CustomerApi";
+
+const FALLBACK_CUSTOMER_TYPES = [
+  {
+    customerTypeId: "contract",
+    customerType: "Contract",
+    customerTypeDescription: "Contract-based customer",
+  },
+  {
+    customerTypeId: "portal",
+    customerType: "Portal",
+    customerTypeDescription: "Portal-based customer",
+  },
+];
+
+function normalizeCustomerTypeOptions(apiBody) {
+  const raw = Array.isArray(apiBody)
+    ? apiBody
+    : Array.isArray(apiBody?.data)
+      ? apiBody.data
+      : Array.isArray(apiBody?.customerTypes)
+        ? apiBody.customerTypes
+        : [];
+
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => ({
+      customerTypeId:
+        item.customerTypeId ??
+        item.id ??
+        item.typeId ??
+        item.value ??
+        item.customer_type_id ??
+        "",
+      customerType:
+        item.customerType ??
+        item.type ??
+        item.name ??
+        item.label ??
+        String(item.value ?? item.id ?? ""),
+      customerTypeDescription:
+        item.customerTypeDescription ??
+        item.description ??
+        item.tooltip ??
+        "",
+    }))
+    .filter(
+      (item) =>
+        String(item.customerTypeId).trim() && String(item.customerType).trim()
+    );
+}
+
+function mapCustomerApiToForm(api) {
+  if (!api || typeof api !== "object") return null;
+
+  return {
+    customerBillingName: api.customerBillingName ?? api.customerName ?? "",
+    customerCode: api.customerCode ?? "",
+    shortName: api.shortName ?? "",
+    longName: api.longName ?? "",
+    aliasName: api.aliasName ?? "",
+    customerTypeId:
+      api.customerTypeId ??
+      api.customerType?.customerTypeId ??
+      api.customerType?.id ??
+      api.customerType?.value ??
+      "",
+    addressLine1: api.addressLine1 ?? "",
+    addressLine2: api.addressLine2 ?? "",
+    city: api.city ?? "",
+    country: api.country ?? "",
+    postalCode: api.postalCode ?? api.postCode ?? "",
+    countryCode: api.countryCode ?? "",
+    telephone: api.telephone ?? api.phone ?? api.telephoneNumber ?? "",
+    email: api.email ?? "",
+    website: api.website ?? "",
+    status:
+      api.status ??
+      (typeof api.isActive === "boolean"
+        ? api.isActive
+          ? "active"
+          : "inactive"
+        : "active"),
+  };
+}
+
+export default function CustomerFormModal({
+  isOpen,
+  mode = "add",
+  customerId,
+  onClose,
+  onSubmit,
+  auditUser = "system",
+}) {
+  const [initialValues, setInitialValues] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadErr, setLoadErr] = useState("");
+
+  const [customerTypeOptions, setCustomerTypeOptions] = useState([]);
+  const [customerTypeLoading, setCustomerTypeLoading] = useState(false);
+  const [customerTypeError, setCustomerTypeError] = useState("");
+
+  const title = useMemo(() => {
+    if (mode === "view") return "View Customer";
+    if (mode === "edit") return "Edit Customer";
+    return "Add Customer";
+  }, [mode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCustomerTypes() {
+      try {
+        setCustomerTypeLoading(true);
+        setCustomerTypeError("");
+
+        const body = await fetchCustomerTypes();
+        const normalized = normalizeCustomerTypeOptions(body);
+
+        if (!cancelled) {
+          setCustomerTypeOptions(
+            normalized.length > 0 ? normalized : FALLBACK_CUSTOMER_TYPES
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCustomerTypeError("Failed to load customer types. Using defaults.");
+          setCustomerTypeOptions(FALLBACK_CUSTOMER_TYPES);
+        }
+      } finally {
+        if (!cancelled) setCustomerTypeLoading(false);
+      }
+    }
+
+    if (isOpen) {
+      loadCustomerTypes();
+    } else {
+      setInitialValues(null);
+      setLoadErr("");
+      setLoading(false);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      if (!isOpen) {
+        setInitialValues(null);
+        setLoadErr("");
+        setLoading(false);
+        return;
+      }
+
+      if (mode === "add") {
+        setInitialValues({
+          customerBillingName: "",
+          customerCode: "",
+          shortName: "",
+          longName: "",
+          aliasName: "",
+          customerTypeId: customerTypeOptions[0]?.customerTypeId || "",
+          addressLine1: "",
+          addressLine2: "",
+          city: "",
+          country: "",
+          postalCode: "",
+          countryCode: "",
+          telephone: "",
+          email: "",
+          website: "",
+          status: "active",
+        });
+        setLoadErr("");
+        return;
+      }
+
+      if (!customerId) {
+        setLoadErr("Missing customer id");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setLoadErr("");
+
+        const data = await getCustomerById(customerId);
+        const mapped = mapCustomerApiToForm(data);
+
+        if (!ignore) {
+          setInitialValues(mapped);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setLoadErr(err?.message || "Failed to load customer");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, mode, customerId, customerTypeOptions]);
+
+  const handleCancel = () => {
+    onClose?.();
+  };
+
+  return (
+    <Modal title={title} isOpen={isOpen} onClose={onClose}>
+      {loading && <div className="muted">Loading...</div>}
+
+      {loadErr ? (
+        <div className="error" style={{ marginBottom: 8 }}>
+          {loadErr}
+        </div>
+      ) : null}
+
+      {!loading && !loadErr && (
+        <CustomerForm
+          key={`${mode}-${customerId || "new"}`}
+          initialValues={initialValues}
+          mode={mode}
+          onCancel={handleCancel}
+          onSubmit={onSubmit}
+          customerTypeOptions={customerTypeOptions}
+          customerTypeLoading={customerTypeLoading}
+          customerTypeError={customerTypeError}
+          auditUser={auditUser}
+        />
+      )}
+    </Modal>
   );
 }
